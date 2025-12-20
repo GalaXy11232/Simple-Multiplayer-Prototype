@@ -1,0 +1,19 @@
+[gd_scene load_steps=3 format=3 uid="uid://cw2inutombehs"]
+
+[ext_resource type="Script" uid="uid://b26q1v17px731" path="res://broadcast_label.gd" id="1_7bjd6"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_6cvne"]
+font_size = 24
+
+[node name="BroadcastLabel" type="Label"]
+offset_right = 40.0
+offset_bottom = 23.0
+text = "neamtu was slain by niggapowpow21345"
+label_settings = SubResource("LabelSettings_6cvne")
+vertical_alignment = 1
+script = ExtResource("1_7bjd6")
+
+[node name="Timer" type="Timer" parent="."]
+one_shot = true
+
+[connection signal="timeout" from="Timer" to="." method="_timeout"]

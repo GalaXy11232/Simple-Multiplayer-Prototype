@@ -1,0 +1,77 @@
+[gd_scene load_steps=8 format=3 uid="uid://pltix8dmtss1"]
+
+[ext_resource type="Texture2D" uid="uid://be3rc06k74efc" path="res://icon.svg" id="1_4flbx"]
+[ext_resource type="Script" uid="uid://ch4vbqvkdif3e" path="res://player.gd" id="1_onrkg"]
+[ext_resource type="Texture2D" uid="uid://doqhiy0igekf1" path="res://gun.png" id="3_i3pqv"]
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_onrkg"]
+properties/0/path = NodePath("playertag:text")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:position")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath("Health:value")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath("GunContainer:rotation")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_onrkg"]
+radius = 19.0263
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_onrkg"]
+bg_color = Color(1, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_i3pqv"]
+bg_color = Color(0, 1, 0, 1)
+
+[node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_onrkg")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_onrkg")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("1_4flbx")
+
+[node name="Collision" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_onrkg")
+
+[node name="playertag" type="Label" parent="."]
+offset_left = -60.0
+offset_top = -60.0
+offset_right = 60.0
+offset_bottom = -30.0
+text = "Player ultron"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Health" type="ProgressBar" parent="."]
+offset_left = -43.0
+offset_top = -32.0
+offset_right = 43.0
+offset_bottom = -22.0
+theme_override_styles/background = SubResource("StyleBoxFlat_onrkg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_i3pqv")
+step = 1.0
+value = 100.0
+show_percentage = false
+
+[node name="invulnerability" type="Timer" parent="."]
+one_shot = true
+
+[node name="GunContainer" type="Node2D" parent="."]
+
+[node name="GFX" type="Sprite2D" parent="GunContainer"]
+position = Vector2(45, 0)
+scale = Vector2(6, 7.5)
+texture = ExtResource("3_i3pqv")
+
+[node name="Muzzle" type="Marker2D" parent="GunContainer/GFX"]
+position = Vector2(2.5, 0)
+gizmo_extents = 5.0
+
+[connection signal="timeout" from="invulnerability" to="." method="_on_invulnerability_timeout"]

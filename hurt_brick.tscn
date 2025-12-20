@@ -1,0 +1,25 @@
+[gd_scene load_steps=5 format=3 uid="uid://b54gost1m7fjw"]
+
+[ext_resource type="Texture2D" uid="uid://rhlpsl6svisl" path="res://hurtbrick.png" id="1_3u5lx"]
+[ext_resource type="Script" uid="uid://diou5pbcih8yd" path="res://hurt_brick.gd" id="1_8h5px"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_8h5px"]
+size = Vector2(60, 60)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0yjeh"]
+size = Vector2(64, 64)
+
+[node name="HurtBrick" type="StaticBody2D"]
+script = ExtResource("1_8h5px")
+
+[node name="Collision" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_8h5px")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+scale = Vector2(0.0958467, 0.0958466)
+texture = ExtResource("1_3u5lx")
+
+[node name="Hitbox" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
+shape = SubResource("RectangleShape2D_0yjeh")
