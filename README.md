@@ -1,0 +1,2 @@
+# Simple-Multiplayer-Prototype
+Simple Godot game that supports LAN Multiplayer. It's a prototype for future games and it's good to have a valid version control of it. It was made after a tutorial made by curtjs: https://www.youtube.com/@curtjs-dev
