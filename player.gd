@@ -34,6 +34,7 @@ func _ready() -> void:
 		get_node("Sprite").modulate = Color.RED
 	else:
 		health = MAX_HEALTH
+		get_parent().get_node("GameUI/TeamLabel").text = get_meta('team').to_upper()
 
 func _physics_process(delta: float) -> void:
 	if !is_multiplayer_authority():
@@ -86,11 +87,14 @@ func shoot_bullet(shooter_pid) -> void:
 	bullet.set_meta('shooter_pid', shooter_pid)
 	get_parent().add_child(bullet)
 	
+	#if is_multiplayer_authority():
+		#print(get_meta('team'))
+	
 	bullet.global_position = $GunContainer/GFX/Muzzle.global_position
 	bullet.transform = $GunContainer/GFX/Muzzle.global_transform
 	bullet.scale = Vector2.ONE * 0.8
 
-@rpc("any_peer", 'call_local')
+@rpc('any_peer', 'call_local')
 func damage(value: int, damager) -> void:
 	if invulnerable: return
 	
@@ -108,7 +112,6 @@ func damage(value: int, damager) -> void:
 		invulnerability_timer.start()
 		
 		## Broadcast death message
-		#print($playertag.text + " was killed by " + damager.name)
 		var ann_label := BROADCAST_LABEL.instantiate()
 		msg_container.add_child(ann_label)
 		
@@ -119,6 +122,10 @@ func damage(value: int, damager) -> void:
 				ann_label.summon_label($playertag.text + " was killed by old age")
 			else:
 				ann_label.summon_label($playertag.text + " was killed by " + player_by_pid.get_node('playertag').text)
+				
+				var team = player_by_pid.get_meta('team')
+				#if is_multiplayer_authority():
+				get_parent().increment_team_score.rpc(team)
 		else:
 			ann_label.summon_label($playertag.text + " was killed by " + damager.name)
 			

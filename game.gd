@@ -13,23 +13,25 @@ const PLAYER_PATH := preload("res://player.tscn")
 const PLAYER_CAMERA_PATH := preload("res://player_camera.tscn")
 const PORT := 21212
 
-const MAX_PLAYERS := 2
+const MAX_PLAYERS := 4
 var players: Array[Player] = []
+var red_team: Array[Player] = []
+var blue_team: Array[Player] = []
 var peer: ENetMultiplayerPeer
+
+var red_score := 0
+var blue_score := 0
 
 func _ready() -> void:
 	$UI.show()
 	self.hide()
 	await get_tree().process_frame
 	
+	$GameUI/Red.text = "Score: %d" % red_score
+	$GameUI/Blue.text = "Score: %d" % blue_score
+	
 	peer = ENetMultiplayerPeer.new()
 	multiplayer_spawner.spawn_function = add_player
-	
-	#multiplayer.peer_disconnected.connect(
-		#func(id):
-			#if is_instance_valid(get_node(str(id))):
-				#get_node(str(id)).queue_free()
-	#)
 	
 	## SERVER Disconnected
 	multiplayer.server_disconnected.connect( func(): get_tree().quit() )
@@ -43,24 +45,35 @@ func _ready() -> void:
 			
 			# Remove from players array 
 			players = players.filter(func(p): return p != player)
-			
-			#get_tree().quit() 
 	)
+
 
 func _on_host_pressed() -> void:
 	peer = ENetMultiplayerPeer.new()
 	
 	peer.create_server(PORT, MAX_PLAYERS)
 	multiplayer.multiplayer_peer = peer
-	#get_tree().set_multiplayer(SceneMultiplayer.new(), self.get_path())
+
 	self.show()
 	
 	var host_name: String = %NameEntry.text
+	
+	var team: String
+	if $"UI/Multiplayer/Pref Red".button_pressed or $"UI/Multiplayer/Pref Blue".button_pressed:
+		if $"UI/Multiplayer/Pref Red".button_pressed:
+			team = 'red'
+		else:
+			team = 'blue'
+	else:
+		## For host, choose first team by default
+		team = 'red'
+	
 	multiplayer_spawner.spawn({
 		"pid": multiplayer.get_unique_id(),
-		"player_name": host_name
+		"player_name": host_name,
+		'team': team
 	})
-	#rpc("add_player", multiplayer.get_unique_id(), %NameEntry.text)
+	
 	
 	$UI/ishost.show()
 	for addr in IP.get_local_addresses():
@@ -68,11 +81,10 @@ func _on_host_pressed() -> void:
 			$UI/ishost.text += addr + '\n'
 	
 	multiplayer_ui.hide()
-	#rpc("call_join_msg", host_name)
-	
+	$GameUI.show()
 
 @rpc("any_peer", "reliable")
-func request_join(player_name: String) -> void:
+func request_join(player_name: String, team: String) -> void:
 	if !is_multiplayer_authority():
 		return
 		
@@ -82,13 +94,39 @@ func request_join(player_name: String) -> void:
 		rpc_id(pid, "join_denied", "Server is full")
 		return
 	
+	## Check if someone has the same name
+	if player_name != '' and not is_name_available(player_name):
+		rpc_id(pid, "join_denied", "Name already exists")
+		return
+		
+		#for child in get_children():
+			#if child is Player: print(child.name)
+
+	
+	## Resolve teams -> choose one that is available
+	if red_team.size() <= blue_team.size():
+		team = 'red'
+	else: team = 'blue'
+	
+	var crt_score : int
+	if team == 'red':
+		crt_score = red_score
+	else: crt_score = blue_score
+	
 	multiplayer_spawner.spawn({
 		'pid': pid,
-		'player_name': player_name
+		'player_name': player_name,
+		'team': team,
+		'team_score': crt_score # Update current team score accordingly
 	})
 	
-	#rpc("call_join_msg", player_name)
 	rpc_id(pid, "join_accepted")
+
+func is_name_available(player_name: String) -> bool:
+	for child in get_children():
+		if child is Player and child.get_node('playertag').text == player_name:
+			return false
+	return true 
 
 @rpc("any_peer", 'reliable')
 func call_join_msg(player_name):
@@ -100,15 +138,18 @@ func call_join_msg(player_name):
 
 @rpc("call_local", "reliable")
 func join_denied(reason: String):
-	print("Join denied:", reason)
-	$err.text = "Server is full!"
+	#print("Join denied:", reason)
+	$Broadcasts/err.text = reason
+	$Broadcasts/err.show()
 
 @rpc("call_local", "reliable")
 func join_accepted():
 	print("Joined successfully!")
 	
 	multiplayer_ui.hide()
+	$GameUI.show()
 	self.show()
+	$Broadcasts/err.hide()
 
 
 func _on_join_pressed() -> void:
@@ -121,12 +162,39 @@ func _on_join_pressed() -> void:
 	multiplayer.multiplayer_peer = peer
 	
 	await multiplayer.connected_to_server
-	rpc_id(1, "request_join", %NameEntry.text)
+	
+	## Also configure preferred team
+	var team: String
+	if $"UI/Multiplayer/Pref Red".button_pressed:
+		team = 'red'
+	elif $"UI/Multiplayer/Pref Blue".button_pressed:
+		team = 'blue'
+	else: team = 'any'
+	
+	rpc_id(1, "request_join", %NameEntry.text, team)
 	#multiplayer_ui.hide()
 	#self.show()
 	#
 	#await get_tree().create_timer(.1).timeout ## Dont know why it tweaks without sleep()
 	#rpc("_call_connect_message", __setup_playertag(%NameEntry.text))
+
+const SCORE_INCREMENT := 10
+@rpc("any_peer", 'reliable')
+func increment_team_score(team: String, value = SCORE_INCREMENT, mode = 'add') -> void:
+	if len(players) > 1:
+		value = value / (len(players) - 1)
+		
+	if team == 'red':
+		if mode == 'add':
+			red_score += value
+		else: red_score = value
+		$GameUI/Red.text = "Score: %d" % red_score
+	else:
+		if mode == 'add':
+			blue_score += value
+		else: blue_score = value
+		
+		$GameUI/Blue.text = "Score: %d" % blue_score
 
 #@rpc("any_peer", 'reliable')
 #func configure_playertag(pid, player_name) -> void:
@@ -151,6 +219,18 @@ func add_player(data):
 	if get_node_or_null(str(pid)) != null:
 		return  # already spawned
 	
+	var team = data.get('team')
+	player.set_meta('team', team)
+	if team == 'red':
+		red_team.append(player)
+	else:
+		blue_team.append(player)
+	
+	## Update both team scores accordingly for newly joined users
+	if is_multiplayer_authority():
+		increment_team_score.rpc('red', red_score, 'set')
+		increment_team_score.rpc('blue', blue_score, 'set')
+	
 	var player_camera = PLAYER_CAMERA_PATH.instantiate()
 	player.name = str(pid)
 	
@@ -158,7 +238,7 @@ func add_player(data):
 		player_name = "Player " + str(players.size() + 1)
 	player.set_playertag(player_name)
 	
-	player.global_position = spawnpoint_nodes.get_child(players.size() % spawnpoints_num).global_position
+	player.global_position = spawnpoint_nodes.get_child(0).global_position#(players.size() % spawnpoints_num).global_position
 	players.append(player)
 	
 	## If not checking for multiplayer_authority, one message for each client appears
@@ -167,14 +247,6 @@ func add_player(data):
 
 	player.add_child(player_camera)
 	return player
-
-func __setup_playertag(nume: String) -> String:
-	var ret: String
-	if len(nume) == 0:
-		ret = "Player "# + str(rpc('get_number_of_players') + 1)
-	else: ret = nume
-	
-	return ret
 
 @rpc("call_local")
 func _call_connect_message(txt) -> void:
@@ -202,3 +274,9 @@ func _call_connect_message(txt) -> void:
 		##multiplayer.multiplayer_peer.close()
 		##multiplayer.multiplayer_peer = null
 		#
+
+
+func _on_pref_red_pressed() -> void: 
+	$"UI/Multiplayer/Pref Blue".button_pressed = false
+func _on_pref_blue_pressed() -> void:
+	$"UI/Multiplayer/Pref Red".button_pressed = false

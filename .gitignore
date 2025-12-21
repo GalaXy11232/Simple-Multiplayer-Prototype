@@ -1,0 +1,10 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+*.exe
+.gitignore
+.*
+
+# Idk if its necessary
+export_presets.cfg 
