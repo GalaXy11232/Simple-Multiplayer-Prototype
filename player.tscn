@@ -27,7 +27,7 @@ bg_color = Color(1, 0, 0, 1)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_i3pqv"]
 bg_color = Color(0, 1, 0, 1)
 
-[node name="Player" type="CharacterBody2D"]
+[node name="Player" type="CharacterBody2D" groups=["player"]]
 script = ExtResource("1_onrkg")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
@@ -63,6 +63,8 @@ show_percentage = false
 [node name="invulnerability" type="Timer" parent="."]
 one_shot = true
 
+[node name="shoot_cooldown" type="Timer" parent="."]
+
 [node name="GunContainer" type="Node2D" parent="."]
 
 [node name="GFX" type="Sprite2D" parent="GunContainer"]
@@ -75,3 +77,4 @@ position = Vector2(2.5, 0)
 gizmo_extents = 5.0
 
 [connection signal="timeout" from="invulnerability" to="." method="_on_invulnerability_timeout"]
+[connection signal="timeout" from="shoot_cooldown" to="." method="_on_shoot_cooldown_timeout"]

@@ -6,6 +6,8 @@ extends Node2D
 @onready var multiplayer_spawner: MultiplayerSpawner = $MultiplayerSpawner
 @onready var msg_container: VBoxContainer = $Broadcasts/Control/MarginContainer/MsgContainer
 
+@onready var game_ui: CanvasLayer = $GameUI
+
 @onready var spawnpoints_num: int = len(spawnpoint_nodes.get_children())
 
 const BROADCAST_LABEL := preload("res://broadcast_label.tscn")
@@ -25,6 +27,7 @@ var blue_score := 0
 func _ready() -> void:
 	$UI.show()
 	self.hide()
+	game_ui.hide()
 	await get_tree().process_frame
 	
 	$GameUI/Red.text = "Score: %d" % red_score
@@ -33,20 +36,34 @@ func _ready() -> void:
 	peer = ENetMultiplayerPeer.new()
 	multiplayer_spawner.spawn_function = add_player
 	
-	## SERVER Disconnected
-	multiplayer.server_disconnected.connect( func(): get_tree().quit() )
-	
-	## PEER Disconnected
-	multiplayer.peer_disconnected.connect(
-		func(pid): 
-			var player = get_node_or_null(str(pid))
-			if player: 
-				player.queue_free()
+	multiplayer.peer_disconnected.connect(_disconnect_peer)
+	multiplayer.server_disconnected.connect(
+		func():
+			#if multiplayer.multiplayer_peer:
+				#multiplayer.multiplayer_peer.close()
 			
-			# Remove from players array 
-			players = players.filter(func(p): return p != player)
+			players.clear()
+			blue_team.clear()
+			red_team.clear()
+			
+			call_deferred('_safe_reload')
 	)
 
+func _safe_reload():
+	var tree := Engine.get_main_loop()
+	if tree and tree is SceneTree:
+		
+		tree.change_scene_to_file("res://game.tscn")
+
+func _disconnect_peer(pid) -> void:
+	if !is_multiplayer_authority(): return
+	
+	var player = get_node_or_null(str(pid))
+	if player:
+		players.erase(player)
+		red_team.erase(player)
+		blue_team.erase(player)
+		player.queue_free()
 
 func _on_host_pressed() -> void:
 	peer = ENetMultiplayerPeer.new()
@@ -83,6 +100,7 @@ func _on_host_pressed() -> void:
 	multiplayer_ui.hide()
 	$GameUI.show()
 
+
 @rpc("any_peer", "reliable")
 func request_join(player_name: String, team: String) -> void:
 	if !is_multiplayer_authority():
@@ -99,14 +117,13 @@ func request_join(player_name: String, team: String) -> void:
 		rpc_id(pid, "join_denied", "Name already exists")
 		return
 		
-		#for child in get_children():
-			#if child is Player: print(child.name)
-
 	
-	## Resolve teams -> choose one that is available
-	if red_team.size() <= blue_team.size():
-		team = 'red'
-	else: team = 'blue'
+	## Resolve teams -> choose one that is available regardless of preferences (balancing)
+	if are_teams_equal() == true:
+		if team == 'any': 
+			team = 'red' # Choose red by default
+	elif are_teams_equal() == false:
+		team = 'red' if red_team.size() < blue_team.size() else 'blue' # Auto balance
 	
 	var crt_score : int
 	if team == 'red':
@@ -121,6 +138,12 @@ func request_join(player_name: String, team: String) -> void:
 	})
 	
 	rpc_id(pid, "join_accepted")
+
+func are_teams_equal() -> Variant:
+	if multiplayer.has_multiplayer_peer() and multiplayer.get_unique_id() == 1:
+		return red_team.size() == blue_team.size()
+	return 'Not server'
+
 
 func is_name_available(player_name: String) -> bool:
 	for child in get_children():
@@ -153,10 +176,6 @@ func join_accepted():
 
 
 func _on_join_pressed() -> void:
-	#if multiplayer.multiplayer_peer != null:
-		#multiplayer.multiplayer_peer.close()
-		#multiplayer.multiplayer_peer = null
-		
 	peer = ENetMultiplayerPeer.new()
 	peer.create_client($UI/Multiplayer/IPEntry.text, PORT)
 	multiplayer.multiplayer_peer = peer
@@ -172,18 +191,10 @@ func _on_join_pressed() -> void:
 	else: team = 'any'
 	
 	rpc_id(1, "request_join", %NameEntry.text, team)
-	#multiplayer_ui.hide()
-	#self.show()
-	#
-	#await get_tree().create_timer(.1).timeout ## Dont know why it tweaks without sleep()
-	#rpc("_call_connect_message", __setup_playertag(%NameEntry.text))
+
 
 const SCORE_INCREMENT := 10
-@rpc("any_peer", 'reliable')
 func increment_team_score(team: String, value = SCORE_INCREMENT, mode = 'add') -> void:
-	if len(players) > 1:
-		value = value / (len(players) - 1)
-		
 	if team == 'red':
 		if mode == 'add':
 			red_score += value
@@ -196,26 +207,14 @@ func increment_team_score(team: String, value = SCORE_INCREMENT, mode = 'add') -
 		
 		$GameUI/Blue.text = "Score: %d" % blue_score
 
-#@rpc("any_peer", 'reliable')
-#func configure_playertag(pid, player_name) -> void:
-	#var size = players.size()
-	#var player = get_node_or_null(str(pid))
-	#if player == null:
-		#return
-	#
-	#var ret: String
-	#if len(player_name) == 0:
-		#ret = "Player " + str(size + 1)
-	#else: ret = player_name
-	#
-	#player.set_playertag(ret)
 
-@rpc("call_local", "reliable")
+#@rpc("call_local", "reliable")
 func add_player(data):
 	var player = PLAYER_PATH.instantiate()
 	var pid = data.get('pid')
 	var player_name = data.get('player_name', "")
 	
+
 	if get_node_or_null(str(pid)) != null:
 		return  # already spawned
 	
@@ -228,8 +227,8 @@ func add_player(data):
 	
 	## Update both team scores accordingly for newly joined users
 	if is_multiplayer_authority():
-		increment_team_score.rpc('red', red_score, 'set')
-		increment_team_score.rpc('blue', blue_score, 'set')
+		increment_team_score('red', red_score, 'set')
+		increment_team_score('blue', blue_score, 'set')
 	
 	var player_camera = PLAYER_CAMERA_PATH.instantiate()
 	player.name = str(pid)
@@ -238,7 +237,7 @@ func add_player(data):
 		player_name = "Player " + str(players.size() + 1)
 	player.set_playertag(player_name)
 	
-	player.global_position = spawnpoint_nodes.get_child(0).global_position#(players.size() % spawnpoints_num).global_position
+	player.global_position = spawnpoint_nodes.get_child(0).global_position#((players.size() % spawnpoints_num)).global_position
 	players.append(player)
 	
 	## If not checking for multiplayer_authority, one message for each client appears
@@ -254,29 +253,22 @@ func _call_connect_message(txt) -> void:
 	msg_container.add_child(joinmsg)
 	joinmsg.summon_label(txt + " connected!", Color.GREEN)
 
-#@rpc("any_peer")
-#func peer_disconnected(pid):
-	#var player = get_node_or_null(str(pid))
-	#if player:
-		#player.queue_free()
-#
-#func _notification(what: int) -> void:
-	#if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		#if multiplayer.multiplayer_peer:
-			#rpc_id(1, 'peer_disconnected', multiplayer.get_unique_id())
-			#
-			#multiplayer.multiplayer_peer.close()
-			#multiplayer.multiplayer_peer = null
-##func _exit_tree() -> void:
-	##if multiplayer.multiplayer_peer:
-		##rpc_id(1, 'peer_disconnected', multiplayer.get_unique_id())
-		##
-		##multiplayer.multiplayer_peer.close()
-		##multiplayer.multiplayer_peer = null
-		#
-
 
 func _on_pref_red_pressed() -> void: 
 	$"UI/Multiplayer/Pref Blue".button_pressed = false
 func _on_pref_blue_pressed() -> void:
 	$"UI/Multiplayer/Pref Red".button_pressed = false
+
+
+func _on_quit_pressed() -> void:
+	for bullet in get_tree().get_nodes_in_group("bullets"):
+		bullet.queue_free()
+	
+	if multiplayer.multiplayer_peer:
+		multiplayer.multiplayer_peer.close()
+		multiplayer.multiplayer_peer = null
+	
+	await get_tree().process_frame
+	await get_tree().create_timer(.05).timeout
+	get_tree().change_scene_to_file("res://game.tscn")
+	
