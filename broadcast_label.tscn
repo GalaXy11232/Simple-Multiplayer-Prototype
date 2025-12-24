@@ -8,7 +8,7 @@ font_size = 24
 [node name="BroadcastLabel" type="Label"]
 offset_right = 40.0
 offset_bottom = 23.0
-text = "neamtu was slain by niggapowpow21345"
+text = "ban tihs guy was slain by powpow21345"
 label_settings = SubResource("LabelSettings_6cvne")
 vertical_alignment = 1
 script = ExtResource("1_7bjd6")

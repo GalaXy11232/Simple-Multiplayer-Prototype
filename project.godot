@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="simple multiplayer (LAN)"
-config/tags=PackedStringArray("prototype", "successful")
+config/tags=PackedStringArray("practice", "prototype", "successful")
 run/main_scene="uid://drshrny2s7ho3"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://icon.svg"

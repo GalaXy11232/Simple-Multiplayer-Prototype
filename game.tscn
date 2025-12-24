@@ -165,9 +165,9 @@ theme_override_constants/separation = 15
 alignment = 2
 
 [node name="err" type="Label" parent="Broadcasts"]
-offset_left = 780.0
+offset_left = 480.0
 offset_top = 150.0
-offset_right = 960.0
+offset_right = 660.0
 offset_bottom = 210.0
 label_settings = SubResource("LabelSettings_feb5d")
 

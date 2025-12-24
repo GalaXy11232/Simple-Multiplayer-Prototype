@@ -66,14 +66,19 @@ func _disconnect_peer(pid) -> void:
 		player.queue_free()
 
 func _on_host_pressed() -> void:
+	var host_name: String = %NameEntry.text
+	## Check if name is too long
+	if len(host_name.strip_edges()) >= 15:
+		rpc_id(1, 'join_denied', "Name is too long. (15 chars max.)")
+		return
+	
+	
 	peer = ENetMultiplayerPeer.new()
 	
 	peer.create_server(PORT, MAX_PLAYERS)
 	multiplayer.multiplayer_peer = peer
 
 	self.show()
-	
-	var host_name: String = %NameEntry.text
 	
 	var team: String
 	if $"UI/Multiplayer/Pref Red".button_pressed or $"UI/Multiplayer/Pref Blue".button_pressed:
@@ -85,9 +90,10 @@ func _on_host_pressed() -> void:
 		## For host, choose first team by default
 		team = 'red'
 	
+	
 	multiplayer_spawner.spawn({
 		"pid": multiplayer.get_unique_id(),
-		"player_name": host_name,
+		"player_name": host_name.strip_edges(),
 		'team': team
 	})
 	
@@ -112,8 +118,13 @@ func request_join(player_name: String, team: String) -> void:
 		rpc_id(pid, "join_denied", "Server is full")
 		return
 	
+	## Check if name is too long
+	if len(player_name.strip_edges()) >= 15:
+		rpc_id(pid, 'join_denied', "Name is too long. (15 chars max.)")
+		return
+	
 	## Check if someone has the same name
-	if player_name != '' and not is_name_available(player_name):
+	if player_name.strip_edges() != '' and not is_name_available(player_name):
 		rpc_id(pid, "join_denied", "Name already exists")
 		return
 		
@@ -132,7 +143,7 @@ func request_join(player_name: String, team: String) -> void:
 	
 	multiplayer_spawner.spawn({
 		'pid': pid,
-		'player_name': player_name,
+		'player_name': player_name.strip_edges(),
 		'team': team,
 		'team_score': crt_score # Update current team score accordingly
 	})
